@@ -28,8 +28,14 @@
 
 #include "GodotFontInterface.h"
 
+#include "core/variant.h"
+#include "scene/resources/font.h"
+#include "scene/resources/dynamic_font.h"
+
 #include <string>
 #include <map>
+
+#include "default_bitmap.gen.h"
 
 static std::map<std::tuple<std::string, int, int, int>, Ref<Font>> _font_cache;
 
@@ -74,65 +80,65 @@ GodotFontInterface::GodotFontInterface() {}
 
 GodotFontInterface::~GodotFontInterface() {}
 
-bool GodotFontInterface::LoadFontFace(const String& /*file_name*/, bool /*fallback_face*/)
+bool GodotFontInterface::LoadFontFace(const Rml::String& /*file_name*/, bool /*fallback_face*/)
 {
 	return false;
 }
 
-bool GodotFontInterface::LoadFontFace(const byte* /*data*/, int /*data_size*/, const String& /*font_family*/, Style::FontStyle /*style*/,
-	Style::FontWeight /*weight*/, bool /*fallback_face*/)
+bool GodotFontInterface::LoadFontFace(const Rml::byte* /*data*/, int /*data_size*/, const Rml::String& /*font_family*/, Rml::Style::FontStyle /*style*/,
+	Rml::Style::FontWeight /*weight*/, bool /*fallback_face*/)
 {
 	return false;
 }
 
-FontFaceHandle GodotFontInterface::GetFontFaceHandle(const String& /*family*/, Style::FontStyle /*style*/, Style::FontWeight /*weight*/,
+Rml::FontFaceHandle GodotFontInterface::GetFontFaceHandle(const Rml::String& /*family*/, Rml::Style::FontStyle /*style*/, Rml::Style::FontWeight /*weight*/,
 	int /*size*/)
 {
 	return 0;
 }
 
-FontEffectsHandle GodotFontInterface::PrepareFontEffects(FontFaceHandle /*handle*/, const FontEffectList& /*font_effects*/)
+Rml::FontEffectsHandle GodotFontInterface::PrepareFontEffects(Rml::FontFaceHandle /*handle*/, const Rml::FontEffectList& /*font_effects*/)
 {
 	return 0;
 }
 
-int GodotFontInterface::GetSize(FontFaceHandle /*handle*/)
+int GodotFontInterface::GetSize(Rml::FontFaceHandle /*handle*/)
 {
 	return 0;
 }
 
-int GodotFontInterface::GetXHeight(FontFaceHandle /*handle*/)
+int GodotFontInterface::GetXHeight(Rml::FontFaceHandle /*handle*/)
 {
 	return 0;
 }
 
-int GodotFontInterface::GetLineHeight(FontFaceHandle /*handle*/)
+int GodotFontInterface::GetLineHeight(Rml::FontFaceHandle /*handle*/)
 {
 	return 0;
 }
 
-int GodotFontInterface::GetBaseline(FontFaceHandle /*handle*/)
+int GodotFontInterface::GetBaseline(Rml::FontFaceHandle /*handle*/)
 {
 	return 0;
 }
 
-float GodotFontInterface::GetUnderline(FontFaceHandle /*handle*/, float& /*thickness*/)
+float GodotFontInterface::GetUnderline(Rml::FontFaceHandle /*handle*/, float& /*thickness*/)
 {
 	return 0;
 }
 
-int GodotFontInterface::GetStringWidth(FontFaceHandle /*handle*/, const String& /*string*/, Character /*prior_character*/)
+int GodotFontInterface::GetStringWidth(Rml::FontFaceHandle /*handle*/, const Rml::String& /*string*/, Rml::Character /*prior_character*/)
 {
 	return 0;
 }
 
-int GodotFontInterface::GenerateString(FontFaceHandle /*face_handle*/, FontEffectsHandle /*font_effects_handle*/, const String& /*string*/,
-	const Vector2f& /*position*/, const Colourb& /*colour*/, float /*opacity*/, GeometryList& /*geometry*/)
+int GodotFontInterface::GenerateString(Rml::FontFaceHandle /*face_handle*/, Rml::FontEffectsHandle /*font_effects_handle*/, const Rml::String& /*string*/,
+	const Rml::Vector2f& /*position*/, const Rml::Colourb& /*colour*/, float /*opacity*/, Rml::GeometryList& /*geometry*/)
 {
 	return 0;
 }
 
-int GodotFontInterface::GetVersion(FontFaceHandle /*handle*/)
+int GodotFontInterface::GetVersion(Rml::FontFaceHandle /*handle*/)
 {
 	return 0;
 }

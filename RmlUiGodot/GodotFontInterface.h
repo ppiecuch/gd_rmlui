@@ -35,48 +35,48 @@
 	@author Pawel Piecuch
  */
 
-class GodotFontInterface : public FontEngineInterface
+class GodotFontInterface : public Rml::FontEngineInterface
 {
 public:
 	GodotFontInterface();
 	virtual ~GodotFontInterface();
 
 	/// Called by RmlUi when it wants to load a font face from file.
-	virtual bool LoadFontFace(const String& file_name, bool fallback_face);
+	virtual bool LoadFontFace(const Rml::String& file_name, bool fallback_face);
 
 	/// Called by RmlUi when it wants to load a font face from memory, registered using the provided family, style, and weight.
-	virtual bool LoadFontFace(const byte* data, int data_size, const String& family, Style::FontStyle style, Style::FontWeight weight, bool fallback_face);
+	virtual bool LoadFontFace(const Rml::byte* data, int data_size, const Rml::String& family, Rml::Style::FontStyle style, Rml::Style::FontWeight weight, bool fallback_face);
 
 	/// Called by RmlUi when a font configuration is resolved for an element. Should return a handle that
 	/// can later be used to resolve properties of the face, and generate string geometry to be rendered.
-	virtual FontFaceHandle GetFontFaceHandle(const String& family, Style::FontStyle style, Style::FontWeight weight, int size);
+	virtual Rml::FontFaceHandle GetFontFaceHandle(const Rml::String& family, Rml::Style::FontStyle style, Rml::Style::FontWeight weight, int size);
 
 	/// Called by RmlUi when a list of font effects is resolved for an element with a given font face.
-	virtual FontEffectsHandle PrepareFontEffects(FontFaceHandle handle, const FontEffectList &font_effects);
+	virtual Rml::FontEffectsHandle PrepareFontEffects(Rml::FontFaceHandle handle, const Rml::FontEffectList &font_effects);
 
 	/// Should return the point size of this font face.
-	virtual int GetSize(FontFaceHandle handle);
+	virtual int GetSize(Rml::FontFaceHandle handle);
 	/// Should return the pixel height of a lower-case x in this font face.
-	virtual int GetXHeight(FontFaceHandle handle);
+	virtual int GetXHeight(Rml::FontFaceHandle handle);
 	/// Should return the default height between this font face's baselines.
-	virtual int GetLineHeight(FontFaceHandle handle);
+	virtual int GetLineHeight(Rml::FontFaceHandle handle);
 
 	/// Should return the font's baseline, as a pixel offset from the bottom of the font.
-	virtual int GetBaseline(FontFaceHandle handle);
+	virtual int GetBaseline(Rml::FontFaceHandle handle);
 
 	/// Should return the font's underline, as a pixel offset from the bottom of the font.
-	virtual float GetUnderline(FontFaceHandle handle, float &thickness);
+	virtual float GetUnderline(Rml::FontFaceHandle handle, float &thickness);
 
 	/// Called by RmlUi when it wants to retrieve the width of a string when rendered with this handle.
-	virtual int GetStringWidth(FontFaceHandle handle, const String& string, Character prior_character = Character::Null);
+	virtual int GetStringWidth(Rml::FontFaceHandle handle, const Rml::String& string, Rml::Character prior_character = Rml::Character::Null);
 
 	/// Called by RmlUi when it wants to retrieve the geometry required to render a single line of text.
-	virtual int GenerateString(FontFaceHandle face_handle, FontEffectsHandle font_effects_handle, const String& string, const Vector2f& position,
-		const Colourb& colour, float opacity, GeometryList& geometry);
+	virtual int GenerateString(Rml::FontFaceHandle face_handle, Rml::FontEffectsHandle font_effects_handle, const Rml::String& string, const Rml::Vector2f& position,
+		const Rml::Colourb& colour, float opacity, Rml::GeometryList& geometry);
 
 	/// Called by RmlUi to determine if the text geometry is required to be re-generated. Whenever the returned version
 	/// is changed, all geometry belonging to the given face handle will be re-generated.
-	virtual int GetVersion(FontFaceHandle handle);
+	virtual int GetVersion(Rml::FontFaceHandle handle);
 };
 
 #endif // RMLUI_GODOT_FONTENGINEINTERFACE_H

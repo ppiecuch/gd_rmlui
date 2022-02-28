@@ -1,4 +1,4 @@
-#include "gd_godot_rmlui.h"
+#include "gd_rmlui.h"
 
 #include "RmlUiGodot/GodotRenderInterface.h"
 #include "RmlUiGodot/GodotSystemInterface.h"

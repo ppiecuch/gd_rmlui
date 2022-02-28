@@ -1,4 +1,6 @@
-### LibRocket/RmlUI module for Godot
+## LibRocket/RmlUI module for GodotEngine
+
+This is native Godot module that should be compiled together with the engine.
 
 ### Reference:
   1. https://github.com/underdoeg/ofxLibRocket
