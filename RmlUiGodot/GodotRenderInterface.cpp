@@ -50,11 +50,13 @@ struct TextureWrapper
 	TextureWrapper(const Ref<Texture> &texture) : texture(texture) {}
 };
 
-GodotRenderInterface::GodotRenderInterface() {
+GodotRenderInterface::GodotRenderInterface()
+{
 	canvas_item = VisualServer::get_singleton()->canvas_item_create();
 }
 
-GodotRenderInterface::~GodotRenderInterface() {
+GodotRenderInterface::~GodotRenderInterface()
+{
 	VisualServer::get_singleton()->free(canvas_item);
 }
 
@@ -63,16 +65,14 @@ void GodotRenderInterface::RenderGeometry(Rml::Vertex *vertices, int num_vertice
 {
 	PoolVector2Array v, t;
 	PoolColorArray c;
-	for(int i = 0; i < num_vertices; i++)
-	{
+	for(int i = 0; i < num_vertices; i++) {
 		v.push_back(Vector2(vertices[i].position.x, vertices[i].position.y));
 		t.push_back(Vector2(vertices[i].tex_coord.x, vertices[i].tex_coord.y));
 		c.push_back(Color(vertices[i].colour.red/255.0, vertices[i].colour.green/255.0, vertices[i].colour.blue/255.f, vertices[i].colour.alpha/255.0));
 	}
 
 	PoolIntArray index;
-	for(int i = 0; i < num_indices; i++)
-	{
+	for(int i = 0; i < num_indices; i++) {
 		index.push_back(indices[i]);
 	}
 
@@ -105,16 +105,14 @@ Rml::CompiledGeometryHandle GodotRenderInterface::CompileGeometry(Rml::Vertex *v
 
 	PoolVector2Array v, t;
 	PoolColorArray c;
-	for(int i = 0; i < num_vertices; i++)
-	{
+	for(int i = 0; i < num_vertices; i++) {
 		v.push_back(Vector2(vertices[i].position.x, vertices[i].position.y));
 		t.push_back(Vector2(vertices[i].tex_coord.x, vertices[i].tex_coord.y));
 		c.push_back(Color(vertices[i].colour.red/255.0, vertices[i].colour.green/255.0, vertices[i].colour.blue/255.f, vertices[i].colour.alpha/255.0));
 	}
 
 	PoolIntArray index;
-	for(int i = 0; i < num_indices; i++)
-	{
+	for(int i = 0; i < num_indices; i++) {
 		index.push_back(indices[i]);
 	}
 
@@ -131,7 +129,7 @@ Rml::CompiledGeometryHandle GodotRenderInterface::CompileGeometry(Rml::Vertex *v
 	wrapper->mesh->add_surface_from_arrays(Mesh::PRIMITIVE_TRIANGLES, mesh_array, Array(), Mesh::ARRAY_FLAG_USE_2D_VERTICES);
 
 
-	return (Rml::CompiledGeometryHandle) wrapper;
+	return (Rml::CompiledGeometryHandle)wrapper;
 }
 
 // Called by RmlUi when it wants to render application-compiled geometry.
@@ -173,12 +171,9 @@ void GodotRenderInterface::SetScissorRegion(int x, int y, int width, int height)
 // Called by RmlUi when a texture is required by the library.
 bool GodotRenderInterface::LoadTexture(Rml::TextureHandle &texture_handle, Rml::Vector2i &texture_dimensions, const Rml::String &source)
 {
-	if (RES texture = ResourceLoader::load(source.c_str(), "Texture"))
-	{
+	if (RES texture = ResourceLoader::load(source.c_str(), "Texture")) {
 		TextureWrapper *wrapper = memnew(TextureWrapper(texture));
-
 		texture_handle = (Rml::TextureHandle)wrapper;
-
 		Rml::Log::Message(Rml::Log::LT_INFO, "Texture loaded from %s.", source.c_str());
 
 		return true;
