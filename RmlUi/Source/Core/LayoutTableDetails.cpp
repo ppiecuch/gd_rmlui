@@ -27,8 +27,9 @@
  */
 
 #include "LayoutTableDetails.h"
-#include "LayoutDetails.h"
+#include "../../Include/RmlUi/Core/ComputedValues.h"
 #include "../../Include/RmlUi/Core/Element.h"
+#include "LayoutDetails.h"
 #include <algorithm>
 #include <float.h>
 
@@ -220,7 +221,7 @@ void TableGrid::PushRow(Element* element_row, ElementList cell_elements)
 		{
 			Element* element_cell = element_row->GetChild(j);
 
-			const Style::Display cell_display = element_cell->GetComputedValues().display;
+			const Style::Display cell_display = element_cell->GetComputedValues().display();
 			if (cell_display == Style::Display::TableCell)
 			{
 				cell_elements.push_back(element_cell);
@@ -410,7 +411,7 @@ void TracksSizing::InitializeSize(TrackMetric& metric, float& margin_a, float& m
 
 	// Find the min/max size.
 	metric.min_size = ResolveValue(computed.min_size, table_initial_content_size);
-	metric.max_size = (computed.max_size.value < 0.f ? FLT_MAX : ResolveValue(computed.max_size, table_initial_content_size));
+	metric.max_size = ResolveValue(computed.max_size, table_initial_content_size);
 
 	if (target_box == Style::BoxSizing::ContentBox && computed.box_sizing == Style::BoxSizing::BorderBox)
 	{

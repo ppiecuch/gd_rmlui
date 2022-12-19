@@ -507,7 +507,7 @@ void URL::ConstructURL() const
 		{
 			RMLUI_ASSERTMSG( !host.empty(), "Can't have a port without a host!" );
 			char port_string[16];
-			sprintf(port_string, ":%d/", port);
+			snprintf(port_string, 16, ":%d/", port);
 			url += port_string;
 		}
 		else
@@ -557,7 +557,7 @@ String URL::UrlEncode(const String &value)
 			encoded += c;
 		else
 		{
-			sprintf(hex, "%%%02X", c);
+			snprintf(hex, 4, "%%%02X", c);
 			encoded += hex;
 		}
 	}

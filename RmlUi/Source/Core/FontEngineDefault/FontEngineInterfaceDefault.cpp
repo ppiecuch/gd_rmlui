@@ -42,9 +42,9 @@ FontEngineInterfaceDefault::~FontEngineInterfaceDefault()
 	FontProvider::Shutdown();
 }
 
-bool FontEngineInterfaceDefault::LoadFontFace(const String& file_name, bool fallback_face)
+bool FontEngineInterfaceDefault::LoadFontFace(const String& file_name, bool fallback_face, Style::FontWeight weight)
 {
-	return FontProvider::LoadFontFace(file_name, fallback_face);
+	return FontProvider::LoadFontFace(file_name, fallback_face, weight);
 }
 
 bool FontEngineInterfaceDefault::LoadFontFace(const byte* data, int data_size, const String& font_family, Style::FontStyle style, Style::FontWeight weight, bool fallback_face)
@@ -111,6 +111,11 @@ int FontEngineInterfaceDefault::GetVersion(FontFaceHandle handle)
 {
 	auto handle_default = reinterpret_cast<FontFaceHandleDefault*>(handle);
 	return handle_default->GetVersion();
+}
+
+void FontEngineInterfaceDefault::ReleaseFontResources()
+{
+	FontProvider::ReleaseFontResources();
 }
 
 } // namespace Rml

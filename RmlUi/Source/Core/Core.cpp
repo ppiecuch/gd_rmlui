@@ -28,6 +28,7 @@
 
 #include "../../Include/RmlUi/Core/Core.h"
 #include "../../Include/RmlUi/Core/Context.h"
+#include "../../Include/RmlUi/Core/Element.h"
 #include "../../Include/RmlUi/Core/Factory.h"
 #include "../../Include/RmlUi/Core/FileInterface.h"
 #include "../../Include/RmlUi/Core/FontEngineInterface.h"
@@ -331,9 +332,9 @@ int GetNumContexts()
 	return (int) contexts.size();
 }
 
-bool LoadFontFace(const String& file_name, bool fallback_face)
+bool LoadFontFace(const String& file_path, bool fallback_face, Style::FontWeight weight)
 {
-	return font_interface->LoadFontFace(file_name, fallback_face);
+	return font_interface->LoadFontFace(file_path, fallback_face, weight);
 }
 
 bool LoadFontFace(const byte* data, int data_size, const String& font_family, Style::FontStyle style, Style::FontWeight weight, bool fallback_face)
@@ -385,6 +386,20 @@ void ReleaseMemoryPools()
 	{
 		delete observerPtrBlockPool;
 		observerPtrBlockPool = nullptr;
+	}
+}
+
+void ReleaseFontResources()
+{
+	if (font_interface)
+	{
+		for (const auto& name_context : contexts)
+			name_context.second->GetRootElement()->DirtyFontFaceRecursive();
+
+		font_interface->ReleaseFontResources();
+
+		for (const auto& name_context : contexts)
+			name_context.second->Update();
 	}
 }
 
