@@ -39,6 +39,7 @@
 #include "../../../Include/RmlUi/Core/Math.h"
 #include "../../../Include/RmlUi/Core/StringUtilities.h"
 #include "../../../Include/RmlUi/Core/SystemInterface.h"
+#include "../../../Include/RmlUi/Core/Context.h"
 #include "../Clock.h"
 #include "ElementTextSelection.h"
 #include <algorithm>
@@ -58,6 +59,48 @@ static CharacterClass GetCharacterClass(char c)
 	if (c == '\n')
 		return CharacterClass::Newline;
 	return CharacterClass::Whitespace;
+}
+
+static int ConvertCharacterOffsetToByteOffset(const String& value, int character_offset)
+{
+	if (character_offset >= (int)value.size())
+		return (int)value.size();
+
+	int character_count = 0;
+	for (auto it = StringIteratorU8(value); it; ++it)
+	{
+		character_count += 1;
+		if (character_count > character_offset)
+			return (int)it.offset();
+	}
+	return (int)value.size();
+}
+
+static int ConvertByteOffsetToCharacterOffset(const String& value, int byte_offset)
+{
+	int character_count = 0;
+	for (auto it = StringIteratorU8(value); it; ++it)
+	{
+		if (it.offset() >= byte_offset)
+			break;
+		character_count += 1;
+	}
+	return character_count;
+}
+
+// Clamps the value to the given maximum number of unicode code points. Returns true if the value was changed.
+static bool ClampValue(String& value, int max_length)
+{
+	if (max_length >= 0)
+	{
+		int max_byte_length = ConvertCharacterOffsetToByteOffset(value, max_length);
+		if (max_byte_length < (int)value.size())
+		{
+			value.erase((size_t)max_byte_length);
+			return true;
+		}
+	}
+	return false;
 }
 
 WidgetTextInput::WidgetTextInput(ElementFormControl* _parent) : internal_dimensions(0, 0), scroll_offset(0, 0), selection_geometry(_parent), cursor_position(0, 0), cursor_size(0, 0), cursor_geometry(_parent)
@@ -132,6 +175,15 @@ WidgetTextInput::~WidgetTextInput()
 	parent->RemoveEventListener(EventId::Dblclick, this, true);
 	parent->RemoveEventListener(EventId::Drag, this, true);
 
+	// This widget might be parented by an input element, which may now be constructing a completely different type.
+	// Thus, remove all properties set by this widget so they don't affect the new type.
+	parent->RemoveProperty(PropertyId::WhiteSpace);
+	parent->RemoveProperty(PropertyId::OverflowX);
+	parent->RemoveProperty(PropertyId::OverflowY);
+	parent->RemoveProperty(PropertyId::Drag);
+	parent->RemoveProperty(PropertyId::WordBreak);
+	parent->RemoveProperty(PropertyId::TextTransform);
+
 	// Remove all the children added by the text widget.
 	parent->RemoveChild(text_element);
 	parent->RemoveChild(selected_text_element);
@@ -168,29 +220,10 @@ void WidgetTextInput::SetMaxLength(int _max_length)
 	if (max_length != _max_length)
 	{
 		max_length = _max_length;
-		if (max_length >= 0)
-		{
-			String value = GetValue();
 
-			int num_characters = 0;
-			size_t i_erase = value.size();
-
-			for (auto it = StringIteratorU8(value); it; ++it)
-			{
-				num_characters += 1;
-				if (num_characters > max_length)
-				{
-					i_erase = size_t(it.offset());
-					break;
-				}
-			}
-
-			if(i_erase < value.size())
-			{
-				value.erase(i_erase);
-				GetElement()->SetAttribute("value", value);
-			}
-		}
+		String value = GetValue();
+		if (ClampValue(value, max_length))
+			GetElement()->SetAttribute("value", value);
 	}
 }
 
@@ -204,6 +237,49 @@ int WidgetTextInput::GetLength() const
 {
 	size_t result = StringUtilities::LengthUTF8(GetValue());
 	return (int)result;
+}
+
+void WidgetTextInput::Select()
+{
+	SetSelectionRange(0, INT_MAX);
+}
+
+void WidgetTextInput::SetSelectionRange(int selection_start, int selection_end)
+{
+	const String& value = GetValue();
+	const int byte_start = ConvertCharacterOffsetToByteOffset(value, selection_start);
+	const int byte_end = ConvertCharacterOffsetToByteOffset(value, selection_end);
+	const bool is_selecting = (byte_start != byte_end);
+	
+	cursor_wrap_down = true;
+	absolute_cursor_index = byte_end;
+
+	bool selection_changed = false;
+	if (is_selecting)
+	{
+		selection_anchor_index = byte_start;
+		selection_changed = UpdateSelection(true);
+	}
+	else
+	{
+		selection_changed = UpdateSelection(false);
+	}
+
+	UpdateCursorPosition(true);
+
+	if (selection_changed)
+		FormatText();
+}
+
+void WidgetTextInput::GetSelection(int* selection_start, int* selection_end, String* selected_text) const
+{
+	const String& value = GetValue();
+	if (selection_start)
+		*selection_start = ConvertByteOffsetToCharacterOffset(value, selection_begin_index);
+	if (selection_end)
+		*selection_end = ConvertByteOffsetToCharacterOffset(value, selection_begin_index + selection_length);
+	if (selected_text)
+		*selected_text = value.substr(Math::Min((size_t)selection_begin_index, (size_t)value.size()), (size_t)selection_length);
 }
 
 // Update the colours of the selected text.
@@ -252,6 +328,11 @@ void WidgetTextInput::OnUpdate()
 		{
 			cursor_timer += CURSOR_BLINK_TIME;
 			cursor_visible = !cursor_visible;
+		}
+
+		if(parent->IsVisible(true)) {
+			if(Context* ctx = parent->GetContext())
+				ctx->RequestNextUpdate(cursor_timer);
 		}
 	}
 }
@@ -384,10 +465,7 @@ void WidgetTextInput::ProcessEvent(Event& event)
 		case Input::KI_A:
 		{
 			if (ctrl)
-			{
-				selection_changed = MoveCursorHorizontal(CursorMovement::Begin, false);
-				selection_changed |= MoveCursorHorizontal(CursorMovement::End, true);
-			}
+				Select();
 		}
 		break;
 
@@ -498,7 +576,8 @@ void WidgetTextInput::ProcessEvent(Event& event)
 			if (UpdateSelection(event == EventId::Drag || event.GetParameter<int>("shift_key", 0) > 0))
 				FormatText();
 
-			ShowCursor(true);
+			const bool move_to_cursor = (event == EventId::Drag);
+			ShowCursor(true, move_to_cursor);
 			cancel_next_drag = false;
 		}
 	}
@@ -523,13 +602,13 @@ bool WidgetTextInput::AddCharacters(String string)
 {
 	SanitizeValue(string);
 
-	if (string.empty())
-		return false;
-
 	if (selection_length > 0)
 		DeleteSelection();
 
-	if (max_length >= 0 && GetLength() >= max_length)
+	if (max_length >= 0)
+		ClampValue(string, Math::Max(max_length - GetLength(), 0));
+
+	if (string.empty())
 		return false;
 
 	String value = GetAttributeValue();
@@ -568,7 +647,7 @@ bool WidgetTextInput::DeleteCharacters(CursorMovement direction)
 void WidgetTextInput::CopySelection()
 {
 	const String& value = GetValue();
-	const String snippet = value.substr(std::min((size_t)selection_begin_index, (size_t)value.size()), (size_t)selection_length);
+	const String snippet = value.substr(Math::Min((size_t)selection_begin_index, (size_t)value.size()), (size_t)selection_length);
 	GetSystemInterface()->SetClipboardText(snippet);
 }
 
@@ -1180,7 +1259,6 @@ void WidgetTextInput::UpdateCursorPosition(bool update_ideal_cursor_position)
 		ideal_cursor_position = cursor_position.x;
 }
 
-// Expand the text selection to the position of the cursor.
 bool WidgetTextInput::UpdateSelection(bool selecting)
 {
 	bool selection_changed = false;

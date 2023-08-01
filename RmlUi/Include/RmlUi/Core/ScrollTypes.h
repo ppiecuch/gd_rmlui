@@ -15,7 +15,7 @@
  *
  * The above copyright notice and this permission notice shall be included in
  * all copies or substantial portions of the Software.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -26,48 +26,38 @@
  *
  */
 
-#include "../../Include/RmlUi/Core/DataModelHandle.h"
-#include "DataModel.h"
+#ifndef RMLUI_CORE_SCROLLTYPES_H
+#define RMLUI_CORE_SCROLLTYPES_H
 
 namespace Rml {
 
+enum class ScrollBehavior {
+	Auto,    // Scroll using the context's configured setting.
+	Smooth,  // Scroll using a smooth animation.
+	Instant, // Scroll instantly.
+};
 
-DataModelHandle::DataModelHandle(DataModel* model) : model(model)
-{}
+enum class ScrollAlignment {
+	Start,   // Align to the top or left edge of the parent element.
+	Center,  // Align to the center of the parent element.
+	End,     // Align to the bottom or right edge of the parent element.
+	Nearest, // Align with minimal scroll change.
+};
 
-bool DataModelHandle::IsVariableDirty(const String& variable_name) {
-	return model->IsVariableDirty(variable_name);
-}
-
-void DataModelHandle::DirtyVariable(const String& variable_name) {
-	model->DirtyVariable(variable_name);
-}
-
-void DataModelHandle::DirtyAllVariables() {
-	model->DirtyAllVariables();
-}
-
-
-DataModelConstructor::DataModelConstructor() : model(nullptr), type_register(nullptr) {}
-
-DataModelConstructor::DataModelConstructor(DataModel* model) : model(model), type_register(model->GetDataTypeRegister()) {
-	RMLUI_ASSERT(model);
-}
-
-DataModelHandle DataModelConstructor::GetModelHandle() const {
-	return DataModelHandle(model);
-}
-
-bool DataModelConstructor::BindFunc(const String& name, DataGetFunc get_func, DataSetFunc set_func) {
-	return model->BindFunc(name, std::move(get_func), std::move(set_func));
-}
-
-bool DataModelConstructor::BindEventCallback(const String& name, DataEventFunc event_func) {
-	return model->BindEventCallback(name, std::move(event_func));
-}
-
-bool DataModelConstructor::BindVariable(const String& name, DataVariable data_variable) {
-	return model->BindVariable(name, data_variable);
-}
+/**
+    Defines behavior of Element::ScrollIntoView.
+ */
+struct ScrollIntoViewOptions {
+	ScrollIntoViewOptions(ScrollAlignment vertical = ScrollAlignment::Start, ScrollAlignment horizontal = ScrollAlignment::Nearest,
+		ScrollBehavior behavior = ScrollBehavior::Instant) :
+		vertical(vertical),
+		horizontal(horizontal), behavior(behavior)
+	{}
+	ScrollAlignment vertical;
+	ScrollAlignment horizontal;
+	ScrollBehavior behavior;
+};
 
 } // namespace Rml
+
+#endif

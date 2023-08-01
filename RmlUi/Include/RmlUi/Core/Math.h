@@ -88,6 +88,9 @@ RMLUICORE_API Vector2f Max<Vector2f>(Vector2f a, Vector2f b);
 /// Element-wise minimum.
 template <>
 RMLUICORE_API Vector2f Min<Vector2f>(Vector2f a, Vector2f b);
+/// Element-wise clamp.
+template <>
+RMLUICORE_API Vector2f Clamp<Vector2f>(Vector2f value, Vector2f min, Vector2f max);
 
 /// Color interpolation.
 RMLUICORE_API Colourb RoundedLerp(float t, Colourb c0, Colourb c1);
@@ -111,6 +114,10 @@ RMLUICORE_API float AbsoluteValue(float value);
 /// @param[in] value The number of get the absolute value of.
 /// @return The absolute value of the number.
 RMLUICORE_API int AbsoluteValue(int value);
+/// Calculates the component-wise absolute value of a vector.
+/// @param[in] value The vector of get the absolute value of.
+/// @return The absolute value of the vector.
+RMLUICORE_API Vector2f AbsoluteValue(Vector2f value);
 
 /// Calculates the cosine of an angle.
 /// @param[in] angle The angle to calculate the cosine of, in radians.
@@ -189,6 +196,11 @@ RMLUICORE_API int RoundUpToInteger(float value);
 /// @return The rounded integer.
 RMLUICORE_API int RoundDownToInteger(float value);
 
+/// Decompose floating-point value to its fractional and integral parts.
+/// @param[in] value The value to decompose.
+/// @param[out] integral The integral part of the value.
+/// @return The fractional part of the value.
+RMLUICORE_API float DecomposeFractionalIntegral(float value, float* integral);
 /// Efficiently truncates a floating-point value into an integer.
 /// @param[in] value The value to truncate.
 /// @return The truncated value as a signed integer.

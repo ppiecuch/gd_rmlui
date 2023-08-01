@@ -185,6 +185,11 @@ void Element::Update(float dp_ratio, Vector2f vp_dimensions)
 
 	for (size_t i = 0; i < children.size(); i++)
 		children[i]->Update(dp_ratio, vp_dimensions);
+
+	if(!animations.empty() && IsVisible(true)) {
+		if(Context* ctx = GetContext())
+			ctx->RequestNextUpdate(0);
+	}
 }
 
 void Element::UpdateProperties(const float dp_ratio, const Vector2f vp_dimensions)
@@ -560,9 +565,18 @@ bool Element::IsPointWithinElement(const Vector2f point)
 }
 
 // Returns the visibility of the element.
-bool Element::IsVisible() const
+bool Element::IsVisible(bool include_ancestors) const
 {
-	return visible;
+	if (!include_ancestors)
+		return visible;
+	const Element* element = this;
+	while (element)
+	{
+		if (!element->visible)
+			return false;
+		element = element->parent;
+	}
+	return true;
 }
 
 // Returns the z-index of the element.
@@ -1280,9 +1294,9 @@ bool Element::DispatchEvent(EventId id, const Dictionary& parameters)
 void Element::ScrollIntoView(const ScrollIntoViewOptions options)
 {
 	const Vector2f size = main_box.GetSize(Box::BORDER);
+	ScrollBehavior scroll_behavior = options.behavior;
 
-	Element* scroll_parent = parent;
-	while (scroll_parent != nullptr)
+	for (Element* scroll_parent = parent; scroll_parent; scroll_parent = scroll_parent->GetParentNode())
 	{
 		using Style::Overflow;
 		const ComputedValues& computed = scroll_parent->GetComputedValues();
@@ -1302,17 +1316,16 @@ void Element::ScrollIntoView(const ScrollIntoViewOptions options)
 			const Vector2f delta_scroll_offset_start = parent_client_offset - relative_offset;
 			const Vector2f delta_scroll_offset_end = delta_scroll_offset_start + size - parent_client_size;
 
-			Vector2f new_scroll_offset = old_scroll_offset;
-			new_scroll_offset.x += GetScrollOffsetDelta(options.horizontal, delta_scroll_offset_start.x, delta_scroll_offset_end.x);
-			new_scroll_offset.y += GetScrollOffsetDelta(options.vertical, delta_scroll_offset_start.y, delta_scroll_offset_end.y);
+			Vector2f scroll_delta = {
+				scrollable_box_x ? GetScrollOffsetDelta(options.horizontal, delta_scroll_offset_start.x, delta_scroll_offset_end.x) : 0.f,
+				scrollable_box_y ? GetScrollOffsetDelta(options.vertical, delta_scroll_offset_start.y, delta_scroll_offset_end.y) : 0.f,
+			};
 
-			if (scrollable_box_x)
-				scroll_parent->SetScrollLeft(new_scroll_offset.x);
-			if (scrollable_box_y)
-				scroll_parent->SetScrollTop(new_scroll_offset.y);
+			scroll_parent->ScrollTo(old_scroll_offset + scroll_delta, scroll_behavior);
+
+			// Currently, only a single scrollable parent can be smooth scrolled at a time, so any other parents must be instant scrolled.
+			scroll_behavior = ScrollBehavior::Instant;
 		}
-
-		scroll_parent = scroll_parent->GetParentNode();
 	}
 }
 
@@ -1322,6 +1335,21 @@ void Element::ScrollIntoView(bool align_with_top)
 	options.vertical = (align_with_top ? ScrollAlignment::Start : ScrollAlignment::End);
 	options.horizontal = ScrollAlignment::Nearest;
 	ScrollIntoView(options);
+}
+
+void Element::ScrollTo(Vector2f offset, ScrollBehavior behavior)
+{
+	if (behavior != ScrollBehavior::Instant)
+	{
+		if (Context* context = GetContext())
+		{
+			context->PerformSmoothscrollOnTarget(this, offset - scroll_offset, behavior);
+			return;
+		}
+	}
+
+	SetScrollLeft(offset.x);
+	SetScrollTop(offset.y);
 }
 
 // Appends a child to this element
@@ -1969,6 +1997,26 @@ bool Element::IsLayoutDirty()
 	return false;
 }
 
+Element* Element::GetClosestScrollableContainer()
+{
+	using namespace Style;
+
+	Overflow overflow_x = meta->computed_values.overflow_x();
+	Overflow overflow_y = meta->computed_values.overflow_y();
+	bool scrollable_x = (overflow_x == Overflow::Auto || overflow_x == Overflow::Scroll);
+	bool scrollable_y = (overflow_y == Overflow::Auto || overflow_y == Overflow::Scroll);
+
+	scrollable_x = (scrollable_x && GetScrollWidth() > GetClientWidth());
+	scrollable_y = (scrollable_y && GetScrollHeight() > GetClientHeight());
+
+	if (scrollable_x || scrollable_y || meta->computed_values.overscroll_behavior() == OverscrollBehavior::Contain)
+		return this;
+	else if (parent)
+		return parent->GetClosestScrollableContainer();
+
+	return nullptr;
+}
+
 void Element::ProcessDefaultAction(Event& event)
 {
 	if (event == EventId::Mousedown)
@@ -1977,37 +2025,6 @@ void Element::ProcessDefaultAction(Event& event)
 
 		if (IsPointWithinElement(mouse_pos) && event.GetParameter("button", 0) == 0)
 			SetPseudoClass("active", true);
-	}
-
-	if (event == EventId::Mousescroll)
-	{
-		if (GetScrollHeight() > GetClientHeight())
-		{
-			Style::Overflow overflow_property = meta->computed_values.overflow_y();
-			if (overflow_property == Style::Overflow::Auto ||
-				overflow_property == Style::Overflow::Scroll)
-			{
-				// Stop the propagation if the current element has scrollbars.
-				// This prevents scrolling in parent elements, which is often unintended. If instead desired behavior is
-				// to scroll in parent elements when reaching top/bottom, move StopPropagation inside the next if statement.
-				event.StopPropagation();
-
-				const float wheel_delta = event.GetParameter< float >("wheel_delta", 0.f);
-
-				if ((wheel_delta < 0 && GetScrollTop() > 0) ||
-					(wheel_delta > 0 && GetScrollHeight() > GetScrollTop() + GetClientHeight()))
-				{
-					// Defined as three times the default line-height, multiplied by the dp ratio.
-					float default_scroll_length = 3.f * DefaultComputedValues.line_height().value;
-					if (const Context* context = GetContext())
-						default_scroll_length *= context->GetDensityIndependentPixelRatio();
-
-					SetScrollTop(GetScrollTop() + wheel_delta * default_scroll_length);
-				}
-			}
-		}
-
-		return;
 	}
 
 	if (event.GetPhase() == EventPhase::Target)

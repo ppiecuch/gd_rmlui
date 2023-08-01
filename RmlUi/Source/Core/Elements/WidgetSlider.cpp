@@ -34,6 +34,7 @@
 #include "../../../Include/RmlUi/Core/Input.h"
 #include "../../../Include/RmlUi/Core/Profiling.h"
 #include "../Clock.h"
+#include "../../../Include/RmlUi/Core/Context.h"
 
 namespace Rml {
 
@@ -66,15 +67,10 @@ WidgetSlider::WidgetSlider(ElementFormControl* _parent)
 
 WidgetSlider::~WidgetSlider()
 {
-	if (bar != nullptr)
-	{
+	if (bar)
 		parent->RemoveChild(bar);
-	}
-
-	if (track != nullptr)
-	{
+	if (track)
 		parent->RemoveChild(track);
-	}
 
 	parent->RemoveEventListener(EventId::Blur, this);
 	parent->RemoveEventListener(EventId::Focus, this);
@@ -88,19 +84,14 @@ WidgetSlider::~WidgetSlider()
 
 	for (int i = 0; i < 2; i++)
 	{
-		if (arrows[i] != nullptr)
-		{
+		if (arrows[i])
 			parent->RemoveChild(arrows[i]);
-		}
 	}
 }
 
 // Initialises the slider to a given orientation.
 bool WidgetSlider::Initialise()
 {
-	Property drag_property = Property(Style::Drag::Drag);
-	parent->SetProperty(PropertyId::Drag, drag_property);
-
 	// Create all of our child elements as standard elements, and abort if we can't create them.
 	ElementPtr track_element = Factory::InstanceElement(parent, "*", "slidertrack", XMLAttributes());
 	ElementPtr bar_element = Factory::InstanceElement(parent, "*", "sliderbar", XMLAttributes());
@@ -108,9 +99,7 @@ bool WidgetSlider::Initialise()
 	ElementPtr arrow1_element = Factory::InstanceElement(parent, "*", "sliderarrowinc", XMLAttributes());
 
 	if (!track_element || !bar_element || !arrow0_element || !arrow1_element)
-	{
 		return false;
-	}
 
 	// Add them as non-DOM elements.
 	track = parent->AppendChild(std::move(track_element), false);
@@ -118,8 +107,9 @@ bool WidgetSlider::Initialise()
 	arrows[0] = parent->AppendChild(std::move(arrow0_element), false);
 	arrows[1] = parent->AppendChild(std::move(arrow1_element), false);
 
-	arrows[0]->SetProperty(PropertyId::Drag, drag_property);
-	arrows[1]->SetProperty(PropertyId::Drag, drag_property);
+	const Property drag_property = Property(Style::Drag::Drag);
+	track->SetProperty(PropertyId::Drag, drag_property);
+	bar->SetProperty(PropertyId::Drag, drag_property);
 
 	// Attach the listeners
 	// All listeners are attached to parent, ensuring that we don't get duplicate events when it bubbles from child to parent
@@ -159,6 +149,9 @@ void WidgetSlider::Update()
 				arrow_timers[i] += DEFAULT_REPEAT_PERIOD;
 				SetBarPosition(i == 0 ? OnLineDecrement() : OnLineIncrement());
 			}
+
+			if(Context* ctx = parent->GetContext())
+				ctx->RequestNextUpdate(arrow_timers[i]);
 		}
 	}
 }
@@ -370,7 +363,11 @@ void WidgetSlider::ProcessEvent(Event& event)
 	{
 	case EventId::Mousedown:
 	{
-		if (event.GetTargetElement() == parent || event.GetTargetElement() == track)
+		// Only respond to primary mouse button.
+		if (event.GetParameter("button", -1) != 0)
+			break;
+
+		if (event.GetTargetElement() == track)
 		{
 			float mouse_position, bar_halfsize;
 
@@ -415,7 +412,7 @@ void WidgetSlider::ProcessEvent(Event& event)
 
 	case EventId::Dragstart:
 	{
-		if (event.GetTargetElement() == parent)
+		if (event.GetTargetElement() == bar || event.GetTargetElement() == track)
 		{
 			bar->SetPseudoClass("active", true);
 
@@ -428,7 +425,7 @@ void WidgetSlider::ProcessEvent(Event& event)
 	break;
 	case EventId::Drag:
 	{
-		if (event.GetTargetElement() == parent)
+		if (event.GetTargetElement() == bar || event.GetTargetElement() == track)
 		{
 			float new_bar_offset = event.GetParameter< float >((orientation == HORIZONTAL ? "mouse_x" : "mouse_y"), 0) - bar_drag_anchor;
 			float new_bar_position = AbsolutePositionToBarPosition(new_bar_offset);
@@ -439,7 +436,7 @@ void WidgetSlider::ProcessEvent(Event& event)
 	break;
 	case EventId::Dragend:
 	{
-		if (event.GetTargetElement() == parent)
+		if (event.GetTargetElement() == bar || event.GetTargetElement() == track)
 		{
 			bar->SetPseudoClass("active", false);
 		}

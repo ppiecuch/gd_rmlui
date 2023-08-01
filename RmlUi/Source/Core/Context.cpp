@@ -27,8 +27,8 @@
  */
 
 #include "../../Include/RmlUi/Core/Context.h"
-#include "../../Include/RmlUi/Core/ContextInstancer.h"
 #include "../../Include/RmlUi/Core/ComputedValues.h"
+#include "../../Include/RmlUi/Core/ContextInstancer.h"
 #include "../../Include/RmlUi/Core/Core.h"
 #include "../../Include/RmlUi/Core/DataModelHandle.h"
 #include "../../Include/RmlUi/Core/ElementDocument.h"
@@ -38,21 +38,24 @@
 #include "../../Include/RmlUi/Core/RenderInterface.h"
 #include "../../Include/RmlUi/Core/StreamMemory.h"
 #include "../../Include/RmlUi/Core/SystemInterface.h"
-#include "../../Include/RmlUi/Core/StreamMemory.h"
 #include "DataModel.h"
 #include "EventDispatcher.h"
 #include "PluginRegistry.h"
+#include "RmlUi/Core/Debug.h"
+#include "ScrollController.h"
 #include "StreamFile.h"
 #include <algorithm>
 #include <iterator>
+#include <limits>
 
 
 namespace Rml {
 
-static constexpr float DOUBLE_CLICK_TIME = 0.5f;     // [s]
-static constexpr float DOUBLE_CLICK_MAX_DIST = 3.f;  // [dp]
+static constexpr float DOUBLE_CLICK_TIME = 0.5f;    // [s]
+static constexpr float DOUBLE_CLICK_MAX_DIST = 3.f; // [dp]
+static constexpr float UNIT_SCROLL_LENGTH = 80.f;   // [dp]
 
-Context::Context(const String& name) : name(name), dimensions(0, 0), density_independent_pixel_ratio(1.0f), mouse_position(0, 0), clip_origin(-1, -1), clip_dimensions(-1, -1)
+Context::Context(const String& name) : name(name), dimensions(0, 0), density_independent_pixel_ratio(1.0f), mouse_position(0, 0), clip_origin(-1, -1), clip_dimensions(-1, -1), next_update_timeout(0)
 {
 	instancer = nullptr;
 
@@ -80,7 +83,7 @@ Context::Context(const String& name) : name(name), dimensions(0, 0), density_ind
 	cursor_proxy_document->SetProperty(PropertyId::Decorator, Property());
 	cursor_proxy_document->SetProperty(PropertyId::OverflowX, Property(Style::Overflow::Visible));
 	cursor_proxy_document->SetProperty(PropertyId::OverflowY, Property(Style::Overflow::Visible));
-		
+
 	document_focus_history.push_back(root.get());
 	focus = root.get();
 	hover = nullptr;
@@ -91,13 +94,13 @@ Context::Context(const String& name) : name(name), dimensions(0, 0), density_ind
 	drag_verbose = false;
 	drag_clone = nullptr;
 	drag_hover = nullptr;
-
 	last_click_element = nullptr;
 	last_click_time = 0;
 
 	mouse_active = false;
-
 	enable_cursor = true;
+
+	scroll_controller = MakeUnique<ScrollController>();
 }
 
 Context::~Context()
@@ -178,11 +181,15 @@ float Context::GetDensityIndependentPixelRatio() const
 	return density_independent_pixel_ratio;
 }
 
-// Updates all elements in the element tree.
 bool Context::Update()
 {
 	RMLUI_ZoneScoped;
-	
+
+	next_update_timeout = std::numeric_limits<double>::infinity();
+
+	if(scroll_controller->Update(mouse_position, density_independent_pixel_ratio))
+		RequestNextUpdate(0);
+
 	// Update the hover chain to detect any new or moved elements under the mouse.
 	if (mouse_active)
 		UpdateHoverChain(mouse_position);
@@ -200,11 +207,13 @@ bool Context::Update()
 	root->Update(density_independent_pixel_ratio, Vector2f(dimensions));
 
 	for (int i = 0; i < root->GetNumChildren(); ++i)
+	{
 		if (auto doc = root->GetChild(i)->GetOwnerDocument())
 		{
 			doc->UpdateLayout();
 			doc->UpdatePosition();
 		}
+	}
 
 	// Release any documents that were unloaded during the update.
 	ReleaseUnloadedDocuments();
@@ -646,6 +655,8 @@ bool Context::ProcessMouseButtonDown(int button_index, int key_modifier_state)
 	GenerateMouseEventParameters(parameters, button_index);
 	GenerateKeyModifierEventParameters(parameters, key_modifier_state);
 
+	bool propagate = true;
+
 	if (button_index == 0)
 	{
 		Element* new_focus = hover;
@@ -664,8 +675,6 @@ bool Context::ProcessMouseButtonDown(int button_index, int key_modifier_state)
 		// Save the just-pressed-on element as the pressed element.
 		active = new_focus;
 
-		bool propagate = true;
-		
 		// Call 'onmousedown' on every item in the hover chain, and copy the hover chain to the active chain.
 		if (hover)
 			propagate = hover->DispatchEvent(EventId::Mousedown, parameters);
@@ -723,7 +732,23 @@ bool Context::ProcessMouseButtonDown(int button_index, int key_modifier_state)
 	{
 		// Not the primary mouse button, so we're not doing any special processing.
 		if (hover)
-			hover->DispatchEvent(EventId::Mousedown, parameters);
+			propagate = hover->DispatchEvent(EventId::Mousedown, parameters);
+	}
+
+	if (scroll_controller->GetMode() == ScrollController::Mode::Autoscroll)
+	{
+		scroll_controller->Reset();
+	}
+	else if (button_index == 2 && hover && propagate)
+	{
+		Dictionary scroll_parameters;
+		GenerateMouseEventParameters(scroll_parameters);
+		GenerateKeyModifierEventParameters(scroll_parameters, key_modifier_state);
+		scroll_parameters["autoscroll"] = true;
+
+		// Dispatch a mouse scroll event, this gives elements an opportunity to block autoscroll from being initialized.
+		if (hover->DispatchEvent(EventId::Mousescroll, scroll_parameters))
+			scroll_controller->ActivateAutoscroll(hover->GetClosestScrollableContainer(), mouse_position);
 	}
 
 	return !IsMouseInteracting();
@@ -801,22 +826,51 @@ bool Context::ProcessMouseButtonUp(int button_index, int key_modifier_state)
 			hover->DispatchEvent(EventId::Mouseup, parameters);
 	}
 
+	// If we have autoscrolled while holding the middle mouse button, release the autoscroll mode now.
+	if (scroll_controller->HasAutoscrollMoved())
+		scroll_controller->Reset();
+
 	return result;
 }
 
-// Sends a mouse-wheel movement event into RmlUi.
 bool Context::ProcessMouseWheel(float wheel_delta, int key_modifier_state)
 {
-	if (hover)
-	{
-		Dictionary scroll_parameters;
-		GenerateKeyModifierEventParameters(scroll_parameters, key_modifier_state);
-		scroll_parameters["wheel_delta"] = wheel_delta;
+	return ProcessMouseWheel(Vector2f{0.f, wheel_delta}, key_modifier_state);
+}
 
-		return hover->DispatchEvent(EventId::Mousescroll, scroll_parameters);
+bool Context::ProcessMouseWheel(Vector2f wheel_delta, int key_modifier_state)
+{
+	if (scroll_controller->GetMode() == ScrollController::Mode::Autoscroll)
+	{
+		scroll_controller->Reset();
+		return false;
+	}
+	else if (!hover)
+	{
+		scroll_controller->Reset();
+		return true;
 	}
 
-	return true;
+	Dictionary scroll_parameters;
+	GenerateMouseEventParameters(scroll_parameters);
+	GenerateKeyModifierEventParameters(scroll_parameters, key_modifier_state);
+	scroll_parameters["wheel_delta_x"] = wheel_delta.x;
+	scroll_parameters["wheel_delta_y"] = wheel_delta.y;
+
+	// Dispatch a mouse scroll event, this gives elements an opportunity to block scrolling from being performed.
+	if (!hover->DispatchEvent(EventId::Mousescroll, scroll_parameters))
+		return false;
+
+	const float unit_scroll_length = UNIT_SCROLL_LENGTH * density_independent_pixel_ratio;
+	const Vector2f scroll_length = wheel_delta * unit_scroll_length;
+	Element* target = hover->GetClosestScrollableContainer();
+
+	if (scroll_controller->GetMode() == ScrollController::Mode::Smoothscroll && scroll_controller->GetTarget() == target)
+		scroll_controller->IncrementSmoothscrollTarget(scroll_length);
+	else
+		scroll_controller->ActivateSmoothscroll(target, scroll_length, ScrollBehavior::Auto);
+
+	return target == nullptr;
 }
 
 bool Context::ProcessMouseLeave()
@@ -831,7 +885,12 @@ bool Context::ProcessMouseLeave()
 
 bool Context::IsMouseInteracting() const
 {
-	return (hover && hover != root.get()) || (active && active != root.get());
+	return (hover && hover != root.get()) || (active && active != root.get()) || scroll_controller->GetMode() == ScrollController::Mode::Autoscroll;
+}
+
+void Context::SetDefaultScrollBehavior(ScrollBehavior scroll_behavior, float speed_factor)
+{
+	scroll_controller->SetDefaultScrollBehavior(scroll_behavior, speed_factor);
 }
 
 // Gets the context's render interface.
@@ -866,15 +925,19 @@ void Context::SetInstancer(ContextInstancer* _instancer)
 	instancer = _instancer;
 }
 
-DataModelConstructor Context::CreateDataModel(const String& name)
+DataModelConstructor Context::CreateDataModel(const String& name, DataTypeRegister* data_type_register)
 {
 	if (!data_type_register)
-		data_type_register = MakeUnique<DataTypeRegister>();
+	{
+		if (!default_data_type_register)
+			default_data_type_register = MakeUnique<DataTypeRegister>();
+		data_type_register = default_data_type_register.get();
+	}
 
-	auto result = data_models.emplace(name, MakeUnique<DataModel>(data_type_register->GetTransformFuncRegister()));
+	auto result = data_models.emplace(name, MakeUnique<DataModel>(data_type_register));
 	bool inserted = result.second;
 	if (inserted)
-		return DataModelConstructor(result.first->second.get(), data_type_register.get());
+		return DataModelConstructor(result.first->second.get());
 
 	Log::Message(Log::LT_ERROR, "Data model name '%s' already exists.", name.c_str());
 	return DataModelConstructor();
@@ -882,11 +945,8 @@ DataModelConstructor Context::CreateDataModel(const String& name)
 
 DataModelConstructor Context::GetDataModel(const String& name)
 {
-	if (data_type_register)
-	{
-		if (DataModel* model = GetDataModelPtr(name))
-			return DataModelConstructor(model, data_type_register.get());
-	}
+	if (DataModel* model = GetDataModelPtr(name))
+		return DataModelConstructor(model);
 
 	Log::Message(Log::LT_ERROR, "Data model name '%s' could not be found.", name.c_str());
 	return DataModelConstructor();
@@ -970,6 +1030,9 @@ void Context::OnElementDetach(Element* element)
 		if (it != document_focus_history.end())
 			document_focus_history.erase(it);
 	}
+
+	if (scroll_controller->GetTarget() == element)
+		scroll_controller->Reset();
 }
 
 // Internal callback for when a new element gains focus
@@ -1092,7 +1155,9 @@ void Context::UpdateHoverChain(Vector2i old_mouse_position, int key_modifier_sta
 	{
 		String new_cursor_name;
 
-		if(drag)
+		if (scroll_controller->GetMode() == ScrollController::Mode::Autoscroll)
+			new_cursor_name = scroll_controller->GetAutoscrollCursor(mouse_position, density_independent_pixel_ratio);
+		else if(drag)
 			new_cursor_name = drag->GetComputedValues().cursor();
 		else if (hover)
 			new_cursor_name = hover->GetComputedValues().cursor();
@@ -1282,6 +1347,11 @@ void Context::ReleaseDragClone()
 	}
 }
 
+void Context::PerformSmoothscrollOnTarget(Element* target, Vector2f delta_offset, ScrollBehavior scroll_behavior)
+{
+	scroll_controller->ActivateSmoothscroll(target, delta_offset, scroll_behavior);
+}
+
 DataModel* Context::GetDataModelPtr(const String& name) const
 {
 	auto it = data_models.find(name);
@@ -1397,6 +1467,15 @@ void Context::SetDocumentsBaseTag(const String& tag)
 const String& Context::GetDocumentsBaseTag()
 {
 	return documents_base_tag;
+}
+
+void Context::RequestNextUpdate(double delay) {
+	RMLUI_ASSERT(delay >= 0.0);
+	next_update_timeout = Math::Min(next_update_timeout, delay);
+}
+
+double Context::GetNextUpdateDelay() const {
+	return next_update_timeout;
 }
 
 } // namespace Rml
