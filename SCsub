@@ -14,7 +14,7 @@ env_module = env_modules.Clone()
 sources = (
     Glob("*.cpp")
     + Glob("RmlUi/Source/Core/*.cpp")
-    + Glob("RmlUiGodot/*.cpp")
+    + Glob("RmlUi/Source/Godot/*.cpp")
 )
 if env["target"] == "release_debug" or env["target"] == "debug":
     sources += Glob("RmlUi/Source/Debugger/*.cpp")
