@@ -1,7 +1,7 @@
 #include "gd_rmlui.h"
 
-#include "RmlUiGodot/Godot_Renderer.h"
-#include "RmlUiGodot/Godot_Platform.h"
+#include "Godot/Godot_Renderer.h"
+#include "Godot/Godot_Platform.h"
 
 void GdRmlUIControl::_bind_methods() {
 }
