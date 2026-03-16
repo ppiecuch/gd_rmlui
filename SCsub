@@ -14,6 +14,7 @@ env_module = env_modules.Clone()
 sources = (
     Glob("*.cpp")
     + Glob("RmlUi/Source/Core/*.cpp")
+    + Glob("RmlUi/Source/Core/FontEngineDefault/*.cpp")  # Built-in FreeType font engine
     + Glob("RmlUi/Source/Godot/*.cpp")
 )
 if env["target"] == "release_debug" or env["target"] == "debug":
@@ -27,8 +28,6 @@ if (env["platform"] == "android" and not env["android_rtti"]) or (
     env_module.Append(CPPDEFINES=["RMLUI_USE_CUSTOM_RTTI=0"])
 if is_gcc:
     env_module.Append(CXXFLAGS=["-Wno-maybe-uninitialized"])
-if is_clang_or_gcc:
-    env_module.Append(CXXFLAGS=["-std=gnu++14"])
 if env["builtin_freetype"]:
     env_module.Prepend(CPPPATH=["#thirdparty/freetype/include"])
 

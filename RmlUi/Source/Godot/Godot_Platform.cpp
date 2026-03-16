@@ -37,7 +37,7 @@
 #include <string>
 #include <map>
 
-#include "default_bitmap.gen.h"
+#include "misc/default_bitmap_font.auto.h"
 
 static std::map<std::tuple<std::string, int, int, int>, Ref<Font>> _font_cache;
 

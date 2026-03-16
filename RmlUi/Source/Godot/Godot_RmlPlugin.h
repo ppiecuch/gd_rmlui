@@ -76,6 +76,7 @@ public:
 	}
 
 	static GodotRmlDocument* getDocumentFromRmlUi(Rml::ElementDocument* doc);
+	Rml::Context* getContext() { return context; }
 
 private:
 	void OnDocumentLoad(Rml::ElementDocument *document);
