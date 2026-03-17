@@ -31,6 +31,7 @@
 
 #include <RmlUi/Core/Input.h>
 #include <RmlUi/Core/Plugin.h>
+#include <RmlUi/Lua.h>
 #ifdef DEBUG_ENABLED
 #include <RmlUi/Debugger.h>
 #endif

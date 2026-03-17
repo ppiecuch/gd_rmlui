@@ -57,9 +57,15 @@ void GodotRmlPlugin::setup()
 	{
 		Rml::Shutdown();
 		WARN_PRINT("Failed to initialize RmlUi");
+		return;
 	}
 
+	// Initialize Lua scripting support
+	Rml::Lua::Initialise();
+
+#ifdef DEBUG_ENABLED
 	Rml::Debugger::Initialise(context);
+#endif
 	RegisterPlugin(this);
 
 	initialiseKeyMap();
@@ -268,7 +274,7 @@ void GodotRmlPlugin::initialiseKeyMap()
 }
 
 
-Rml::Input::KeyModifier getKeyModifier(const InputEventWithModifiers *ev)
+Rml::Input::KeyModifier GodotRmlPlugin::getKeyModifier(const InputEventWithModifiers *ev)
 {
 	using namespace Rml::Input;
 

@@ -14,13 +14,20 @@ env_module = env_modules.Clone()
 sources = (
     Glob("*.cpp")
     + Glob("RmlUi/Source/Core/*.cpp")
+    + Glob("RmlUi/Source/Core/Elements/*.cpp")            # Form controls, data grid, tabs, etc.
     + Glob("RmlUi/Source/Core/FontEngineDefault/*.cpp")  # Built-in FreeType font engine
     + Glob("RmlUi/Source/Godot/*.cpp")
+    + Glob("RmlUi/Source/Lua/*.cpp")                     # Lua scripting plugin
+    + Glob("RmlUi/Source/Lua/Elements/*.cpp")
 )
 if env["target"] == "release_debug" or env["target"] == "debug":
     sources += Glob("RmlUi/Source/Debugger/*.cpp")
 
-env_module.Prepend(CPPPATH=["#modules/gdextensions", "#modules/gdextensions/thirdparty", "RmlUi/Include", "RmlUi/Source"])
+env_module.Prepend(CPPPATH=[
+    "#modules/gdextensions", "#modules/gdextensions/thirdparty",
+    "#thirdparty/lua",  # Shared Lua headers (lua.h, lauxlib.h, lualib.h)
+    "RmlUi/Include", "RmlUi/Source",
+])
 
 if (env["platform"] == "android" and not env["android_rtti"]) or (
     env["platform"] == "iphone" and not env["ios_exceptions"]
@@ -31,7 +38,11 @@ if is_gcc:
 if env["builtin_freetype"]:
     env_module.Prepend(CPPPATH=["#thirdparty/freetype/include"])
 
+# Include Lua amalgamation (shared with gd_luascript and other Lua-using modules)
+# Compat defines are set globally in thirdparty/lua/luaconf.h
+thirdparty_sources = ["#thirdparty/lua/lua-all.c"]
+
 # Compile as a static library
-lib = env_module.Library("gd_rmlui", sources)
+lib = env_module.Library("gd_rmlui", thirdparty_sources + sources)
 # Add the library as a dependency of the final executable
 env.Prepend(LIBS=[lib])
