@@ -9,6 +9,12 @@ is_clang_or_gcc = (
     ("gcc" in os.path.basename(env["CC"])) or ("clang" in os.path.basename(env["CC"])) or ("osxcross" in env)
 )
 
+# Lua amalgamation — compiled once with env_modules so every clone inherits
+# the CPPPATH and reuses the same object (shared with gd_bullet_hell, gd_luascript).
+if not env.get("lua_obj"):
+    env_modules.Append(CPPPATH=["#thirdparty/lua"])
+    env["lua_obj"] = env_modules.Object("#thirdparty/lua/lua-all.c")
+
 env_module = env_modules.Clone()
 
 sources = (
@@ -25,7 +31,6 @@ if env["target"] == "release_debug" or env["target"] == "debug":
 
 env_module.Prepend(CPPPATH=[
     "#modules/gdextensions", "#modules/gdextensions/thirdparty",
-    "#thirdparty/lua",  # Shared Lua headers (lua.h, lauxlib.h, lualib.h)
     "RmlUi/Include", "RmlUi/Source",
 ])
 
@@ -38,11 +43,7 @@ if is_gcc:
 if env["builtin_freetype"]:
     env_module.Prepend(CPPPATH=["#thirdparty/freetype/include"])
 
-# Include Lua amalgamation (shared with gd_luascript and other Lua-using modules)
-# Compat defines are set globally in thirdparty/lua/luaconf.h
-thirdparty_sources = ["#thirdparty/lua/lua-all.c"]
-
-# Compile as a static library
-lib = env_module.Library("gd_rmlui", thirdparty_sources + sources)
+# Compile as a static library (lua object included)
+lib = env_module.Library("gd_rmlui", env["lua_obj"] + sources)
 # Add the library as a dependency of the final executable
 env.Prepend(LIBS=[lib])

@@ -700,6 +700,7 @@ const char *RML_EXAMPLE_SETTINGS = R"RML(
 
 #ifdef DOCTEST
 #include "doctest/doctest.h"
+#include "doctest/doctest_godot.h"
 
 TEST_SUITE("[[rmlui]] RmlDocument") {
 	TEST_CASE("[rmlui] default document state") {
@@ -734,13 +735,15 @@ TEST_SUITE("[[rmlui]] GdRmlUIControl") {
 
 	TEST_CASE("[rmlui] load document without plugin returns null") {
 		GdRmlUIControl ctrl;
-		Ref<RmlDocument> doc = ctrl.load_document("nonexistent.rml");
+		Ref<RmlDocument> doc;
+		EXPECT_ERROR(doc = ctrl.load_document("nonexistent.rml"));
 		CHECK(doc.is_null());
 	}
 
 	TEST_CASE("[rmlui] load from string without plugin returns null") {
 		GdRmlUIControl ctrl;
-		Ref<RmlDocument> doc = ctrl.load_document_from_string("<rml><body></body></rml>");
+		Ref<RmlDocument> doc;
+		EXPECT_ERROR(doc = ctrl.load_document_from_string("<rml><body></body></rml>"));
 		CHECK(doc.is_null());
 	}
 }
